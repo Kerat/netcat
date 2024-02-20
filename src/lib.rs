@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, io::Write, net::{TcpListener, TcpStream}};
 
 #[derive (Debug)]
 pub enum NetProtocol {
@@ -21,6 +21,7 @@ pub struct Config {
 }
 
 impl Config {
+    // Create config
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
         let host:String;
         let port:u16;
@@ -45,9 +46,24 @@ impl Config {
     }
 }
 
-// Create config
-
 // Listen TCP
+pub fn listen_tcp(host: String, port: u16) -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind((host, port)).unwrap();
+
+    //accepts connections from clients
+    for stream in listener.incoming() {
+        println!("New connection incomming!");
+        match stream {
+            Ok(mut stream) => {
+                stream.write(b"Hello\n")?;
+                println!("end");
+            },
+            Err(e) => panic!("Error: {e}"),
+        }
+    }
+
+    Ok(())
+}
 
 // Connect TCP
 
@@ -59,5 +75,12 @@ impl Config {
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     println!("run..");
     println!("{:?}", config);
+    match config.proto {
+        NetProtocol::TCP => match config.mode {
+            NetMode::Listen => listen_tcp(config.host, config.port)?,
+            NetMode::Connect => println!("Not supported... yet!")
+        },
+        NetProtocol::UDP => println!("Not supported... yet!")
+    }
     Ok(())
 }
