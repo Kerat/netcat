@@ -1,43 +1,47 @@
 use std::error::Error;
 
+#[derive (Debug)]
 pub enum NetProtocol {
     TCP,
     UDP,
 }
 
+#[derive (Debug)]
+pub enum NetMode {
+    Connect,
+    Listen,
+}
+
+#[derive (Debug)]
 pub struct Config {
-    pub lhost: String,
-    pub lport: u16,
-    pub rhost: String,
-    pub rport: u16,
+    pub host: String,
+    pub port: u16,
     pub proto: NetProtocol,
+    pub mode: NetMode,
 }
 
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        let lhost:String;
-        let lport:u16;
-        let rhost:String;
-        let rport:u16;
+        let host:String;
+        let port:u16;
+        let mode:NetMode;
         if args.len() < 2 {
             return Err("not enough arguments")
         }
         // -l : listen mode
         if args [1] == "-l" {
             println!("listen mode");
-            lhost = String::from("0.0.0.0");
-            lport = args[2].parse::<u16>().unwrap();
-            rhost = String::from("0.0.0.0");
-            rport = 0;
+            host = String::from("0.0.0.0");
+            port = args[2].parse::<u16>().unwrap();
+            mode = NetMode::Listen
         }
         else {
             println!("connect mode");
-            lhost = String::from("0.0.0.0");
-            lport = 0;
-            rhost = args[1].clone();
-            rport = args[2].parse::<u16>().unwrap();
+            host = args[1].clone();
+            port = args[2].parse::<u16>().unwrap();
+            mode = NetMode::Connect
         }
-        Ok(Config{lhost: lhost, lport: lport, rhost: rhost, rport: rport, proto: NetProtocol::TCP})
+        Ok(Config{host, port, proto: NetProtocol::TCP, mode})
     }
 }
 
@@ -54,9 +58,6 @@ impl Config {
 // run 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     println!("run..");
-    println!("{}", config.rhost);
-    println!("{}", config.rport);
-    println!("{}", config.lhost);
-    println!("{}", config.lport);
+    println!("{:?}", config);
     Ok(())
 }
