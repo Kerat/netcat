@@ -1,4 +1,4 @@
-use std::{error::Error, io::Write, net::{TcpListener, TcpStream}};
+use std::{error::Error, io::Write, net::{TcpListener, TcpStream}, thread};
 
 #[derive (Debug)]
 pub enum NetProtocol {
@@ -53,15 +53,18 @@ pub fn listen_tcp(host: String, port: u16) -> Result<(), Box<dyn Error>> {
     //accepts connections from clients
     for stream in listener.incoming() {
         println!("New connection incomming!");
-        match stream {
-            Ok(mut stream) => {
-                stream.write(b"Hello\n")?;
-                println!("end");
-            },
-            Err(e) => panic!("Error: {e}"),
-        }
+        thread::spawn(move || {
+            match stream {
+                Ok(mut stream) => {
+                    loop {
+                        stream.write(b"Hello\n");
+                    }
+                    println!("end");
+                },
+                Err(e) => panic!("Error: {e}"),
+            }
+        });
     }
-
     Ok(())
 }
 
