@@ -1,4 +1,5 @@
-use std::{error::Error, io::Write, net::{TcpListener, TcpStream}, thread};
+use std::{error::Error, io::{self, Read, Write}, net::{TcpListener, TcpStream}, thread};
+use futures::{future::FutureExt, pin_mut, select};
 
 #[derive (Debug)]
 pub enum NetProtocol {
@@ -46,6 +47,40 @@ impl Config {
     }
 }
 
+async fn recv_bytes(mut stream: TcpStream) {
+    let mut buffer = [0;256];
+    match stream.read(&mut buffer[..]) {
+        Ok(bytes_read) => {
+            if bytes_read == 0 {
+                println!("end");
+            }
+            std::io::stdout().write_all(&buffer).unwrap();
+        }
+        Err(e) => panic!("Error: {e}"),
+    }
+}
+
+async fn send_bytes(mut stream: TcpStream) {
+    println!("send bytes");
+    let mut buffer = [0;256];
+    match io::stdin().read(&mut buffer[..]) {
+        Ok(bytes_read) => {
+            stream.write(&mut buffer).unwrap();
+            println!("{} bytes sent to client.", bytes_read)
+        }
+        Err(e) => panic!("Error: {e}"),
+    }
+}
+
+// Handle client
+async fn handle_client(mut stream: TcpStream) {
+    let sent = send_bytes(stream).fuse();
+    pin_mut!(sent);
+    select! {
+        () = sent => println!("test"),
+    }
+}
+
 // Listen TCP
 pub fn listen_tcp(host: String, port: u16) -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind((host, port)).unwrap();
@@ -53,17 +88,12 @@ pub fn listen_tcp(host: String, port: u16) -> Result<(), Box<dyn Error>> {
     //accepts connections from clients
     for stream in listener.incoming() {
         println!("New connection incomming!");
-        thread::spawn(move || {
-            match stream {
-                Ok(mut stream) => {
-                    loop {
-                        stream.write(b"Hello\n");
-                    }
-                    println!("end");
-                },
-                Err(e) => panic!("Error: {e}"),
-            }
-        });
+        match stream {
+            Ok(mut stream) => {
+                thread::spawn(move || handle_client(stream)).join().unwrap()
+            },
+            Err(e) => panic!("Error: {e}"),
+        }
     }
     Ok(())
 }
