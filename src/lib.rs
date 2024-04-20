@@ -1,5 +1,4 @@
 use std::{error::Error, io::{self, Read, Write}, net::{TcpListener, TcpStream}, thread};
-use futures::{future::FutureExt, pin_mut, select};
 
 #[derive (Debug)]
 pub enum NetProtocol {
@@ -47,38 +46,39 @@ impl Config {
     }
 }
 
-async fn recv_bytes(mut stream: TcpStream) {
+fn recv_bytes(mut stream: TcpStream) {
     let mut buffer = [0;256];
-    match stream.read(&mut buffer[..]) {
-        Ok(bytes_read) => {
-            if bytes_read == 0 {
-                println!("end");
+    loop {
+        match stream.read(&mut buffer[..]) {
+            Ok(bytes_read) => {
+                if bytes_read == 0 {
+                    println!("end");
+                }
+                std::io::stdout().write_all(&buffer).unwrap();
             }
-            std::io::stdout().write_all(&buffer).unwrap();
+            Err(e) => panic!("Error: {e}"),
         }
-        Err(e) => panic!("Error: {e}"),
     }
 }
 
-async fn send_bytes(mut stream: TcpStream) {
-    println!("send bytes");
+fn send_bytes(mut stream: TcpStream) {
     let mut buffer = [0;256];
-    match io::stdin().read(&mut buffer[..]) {
-        Ok(bytes_read) => {
-            stream.write(&mut buffer).unwrap();
-            println!("{} bytes sent to client.", bytes_read)
+    loop {
+        match io::stdin().read(&mut buffer[..]) {
+            Ok(bytes_read) => {
+                stream.write(&mut buffer).unwrap();
+                println!("{} bytes sent to client.", bytes_read)
+            }
+            Err(e) => panic!("Error: {e}"),
         }
-        Err(e) => panic!("Error: {e}"),
     }
 }
 
 // Handle client
-async fn handle_client(mut stream: TcpStream) {
-    let sent = send_bytes(stream).fuse();
-    pin_mut!(sent);
-    select! {
-        () = sent => println!("test"),
-    }
+fn handle_client(stream: TcpStream) {
+    let stream_clone = stream.try_clone().unwrap();
+    thread::spawn(move || send_bytes(stream));
+    thread::spawn(move || recv_bytes(stream_clone));
 }
 
 // Listen TCP
@@ -89,7 +89,7 @@ pub fn listen_tcp(host: String, port: u16) -> Result<(), Box<dyn Error>> {
     for stream in listener.incoming() {
         println!("New connection incomming!");
         match stream {
-            Ok(mut stream) => {
+            Ok(stream) => {
                 thread::spawn(move || handle_client(stream)).join().unwrap()
             },
             Err(e) => panic!("Error: {e}"),
